@@ -42,7 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Создаем презентер с моделью
     const presenter = new TripPresenter({ tripModel });
     
-    // Инициализируем приложение
+    // Инициализируем приложениеzzz
     presenter.init();
     
     console.log('Application started successfully');
