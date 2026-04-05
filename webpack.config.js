@@ -10,7 +10,7 @@ module.exports = {
     clean: true, // Удаляем предыдущую сборку перед созданием новой
   },
   devtool: 'source-map', // Генерируем карту исходного кода
-  plugins: [ // Подключаем плагины
+  plugins: [
     new HtmlPlugin({
       template: 'public/index.html',
     }),
@@ -27,7 +27,7 @@ module.exports = {
     }),
   ],
   module: {
-    rules: [ // Добавляем лоадеры
+    rules: [ 
       {
         test: /\.js$/,
         exclude: /(node_modules)/,
