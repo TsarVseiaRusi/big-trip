@@ -62,7 +62,7 @@ export default class ApiService {
 
   /**
    * Метод для обработки ошибок
-   * @param {Error} err Объект ошибки
+   * @param {Error} err Объект ошибк
    */
   static catchError(err) {
     throw err;

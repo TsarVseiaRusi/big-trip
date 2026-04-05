@@ -32,7 +32,7 @@ export const points = [
     dateFrom: '2025-03-18T12:25',
     dateTo: '2025-03-18T13:35',
     basePrice: 160,
-    offers: ['flight-1', 'flight-2'], // Add luggage, Switch to comfort
+    offers: ['flight-1', 'flight-2'], 
     isFavorite: false
   },
   {
@@ -52,7 +52,7 @@ export const points = [
     dateFrom: '2025-03-18T16:20',
     dateTo: '2025-03-18T17:00',
     basePrice: 600,
-    offers: ['check-in-1'], // Add breakfast
+    offers: ['check-in-1'], 
     isFavorite: true
   },
   {
@@ -62,7 +62,7 @@ export const points = [
     dateFrom: '2025-03-19T11:20',
     dateTo: '2025-03-19T13:00',
     basePrice: 50,
-    offers: ['sightseeing-1', 'sightseeing-2'], // Book tickets, Lunch
+    offers: ['sightseeing-1', 'sightseeing-2'], 
     isFavorite: false
   },
   {
@@ -82,7 +82,7 @@ export const points = [
     dateFrom: '2025-03-19T18:00',
     dateTo: '2025-03-19T19:00',
     basePrice: 20,
-    offers: ['flight-1', 'flight-2'], // Add luggage, Switch to comfort
+    offers: ['flight-1', 'flight-2'], 
     isFavorite: false
   },
   {
