@@ -1,4 +1,4 @@
-import AbstractView from './abstract-view.js';
+import AbstractView from '../framework/view/abstract-view.js';
 
 export default class TripFiltersView extends AbstractView {
   constructor({ currentFilter = 'everything', isDisabled = false } = {}) {
@@ -7,7 +7,7 @@ export default class TripFiltersView extends AbstractView {
     this._isDisabled = isDisabled;
   }
 
-  getTemplate() {
+  get template() {
     const filters = [
       { id: 'everything', label: 'Everything' },
       { id: 'future', label: 'Future' },

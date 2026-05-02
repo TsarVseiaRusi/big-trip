@@ -1,4 +1,4 @@
-import AbstractView from './abstract-view.js';
+import AbstractView from '../framework/view/abstract-view.js';
 
 export default class TripInfoView extends AbstractView {
   constructor({ points, destinations }) {
@@ -7,7 +7,7 @@ export default class TripInfoView extends AbstractView {
     this._destinations = destinations;
   }
 
-  getTemplate() {
+  get template() {
     const title = this._generateTitle();
     const dates = this._generateDates();
     const totalCost = this._calculateTotalCost();

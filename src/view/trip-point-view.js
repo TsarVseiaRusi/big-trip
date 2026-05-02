@@ -1,12 +1,15 @@
-import AbstractView from './abstract-view.js';
+import AbstractView from '../framework/view/abstract-view.js';
 
 export default class TripPointView extends AbstractView {
-  constructor({ point }) {
+  constructor({ point, onEditClick }) {
     super();
     this._point = point;
+    this._onEditClick = onEditClick;
+    
+    this._handleEditClick = this._handleEditClick.bind(this);
   }
 
-  getTemplate() {
+  get template() {
     const { dateFrom, dateTo, type, destination, basePrice, offers, isFavorite } = this._point;
     
     const offersHtml = offers && offers.length > 0 ? `
@@ -59,6 +62,11 @@ export default class TripPointView extends AbstractView {
         </div>
       </li>
     `;
+  }
+
+  _handleEditClick(evt) {
+    evt.preventDefault();
+    this._onEditClick();
   }
 
   _formatDate(dateString) {
