@@ -4,6 +4,7 @@ import TripSortView from '../view/trip-sort-view.js';
 import TripListView from '../view/trip-list-view.js';
 import TripPointView from '../view/trip-point-view.js';
 import TripEditView from '../view/trip-edit-view.js';
+import TripCreateView from '../view/trip-create-view.js';
 import { render, replace, remove, RenderPosition } from '../framework/render.js';
 
 export default class TripPresenter {
@@ -14,9 +15,11 @@ export default class TripPresenter {
     this._filtersComponent = null;
     this._sortComponent = null;
     this._listComponent = null;
-    this._pointComponents = new Map(); // Map для хранения компонентов точек
+    this._pointComponents = new Map();
     this._editComponent = null;
-    this._currentPointId = null; // ID текущей редактируемой точки
+    this._currentPointId = null;
+    
+    this._handleNewEventClick = this._handleNewEventClick.bind(this);
   }
 
   init() {
@@ -26,7 +29,13 @@ export default class TripPresenter {
     this._renderList();
     this._renderPoints();
     
-    // Добавляем глобальные обработчики
+    // Добавляем обработчик для кнопки New event
+    const addButton = document.querySelector('.trip-main__event-add-btn');
+    if (addButton) {
+      addButton.removeEventListener('click', this._handleNewEventClick);
+      addButton.addEventListener('click', this._handleNewEventClick);
+    }
+    
     document.addEventListener('keydown', this._handleDocumentKeydown.bind(this));
   }
 
@@ -88,7 +97,6 @@ export default class TripPresenter {
     const point = this._tripModel.getPointById(pointId);
     if (!point) return;
     
-    // Закрываем любую открытую форму редактирования
     if (this._currentPointId) {
       this._closeEditForm();
     }
@@ -99,21 +107,15 @@ export default class TripPresenter {
 
   _replacePointToEditForm(point) {
     const destinations = this._tripModel.getDestinations();
+    const offersByType = this._getOffersByType();
     
-    // Создаем объект offersByType
-    const offersByType = {};
-    this._tripModel.getOffers().forEach(group => {
-      offersByType[group.type] = group.offers;
-    });
-
     const oldComponent = this._pointComponents.get(point.id);
-    const container = oldComponent.element.parentElement;
     
     this._editComponent = new TripEditView({
       point,
       destinations,
       offersByType,
-      onSubmit: () => this._handleEditSubmit(),
+      onSubmit: (updatedPoint) => this._handleEditSubmit(updatedPoint),
       onDelete: () => this._handleEditDelete(),
       onClose: () => this._handleEditClose()
     });
@@ -121,12 +123,146 @@ export default class TripPresenter {
     replace(this._editComponent, oldComponent);
   }
 
-  _closeEditForm() {
+  _handleNewEventClick() {
+    if (this._currentPointId) {
+      this._closeEditForm();
+    }
+    
+    this._currentPointId = null;
+    this._renderCreateForm();
+  }
+
+  _renderCreateForm() {
+    const destinations = this._tripModel.getDestinations();
+    const offersByType = this._getOffersByType();
+    
+    // Создаем временный ID
+    const tempId = `temp-${Date.now()}`;
+    
+    // Создаем пустую точку
+    const emptyPoint = {
+      id: tempId,
+      type: 'flight',
+      destination: '',
+      dateFrom: new Date().toISOString(),
+      dateTo: new Date(Date.now() + 3600000).toISOString(),
+      basePrice: 0,
+      offers: [],
+      isFavorite: false
+    };
+    
+    this._editComponent = new TripEditView({
+      point: emptyPoint,
+      destinations,
+      offersByType,
+      onSubmit: (newPoint) => this._handleCreateSubmit(newPoint),
+      onDelete: null,
+      onClose: () => this._handleCreateClose()
+    });
+    
+    // Вставляем форму в начало списка
+    const listContainer = this._listComponent.element;
+    render(this._editComponent, listContainer, RenderPosition.AFTERBEGIN);
+  }
+
+  _handleEditSubmit(updatedPoint) {
+    // Обновляем точку в модели
+    this._tripModel.updatePoint(updatedPoint.id, updatedPoint);
+    
+    // Обновляем компонент точки
+    const oldComponent = this._pointComponents.get(updatedPoint.id);
+    const newPointComponent = new TripPointView({
+      point: updatedPoint,
+      onEditClick: () => this._handleEditClick(updatedPoint.id)
+    });
+    
+    replace(newPointComponent, oldComponent);
+    this._pointComponents.set(updatedPoint.id, newPointComponent);
+    
+    // Обновляем информацию о маршруте
+    this._updateTripInfo();
+    
+    this._editComponent = null;
+    this._currentPointId = null;
+  }
+
+  _handleCreateSubmit(newPoint) {
+    // Добавляем точку в модель
+    this._tripModel.addPoint(newPoint);
+    
+    // Создаем компонент для новой точки
+    const addedPoint = this._tripModel.getPointById(newPoint.id);
+    
+    // Удаляем форму создания
+    remove(this._editComponent);
+    this._editComponent = null;
+    
+    // Добавляем новую точку в список
+    const listContainer = this._listComponent.element;
+    
+    // Находим правильную позицию для вставки (после формы, если есть)
+    const firstItem = listContainer.firstChild;
+    const newPointComponent = new TripPointView({
+      point: addedPoint,
+      onEditClick: () => this._handleEditClick(addedPoint.id)
+    });
+    
+    this._pointComponents.set(addedPoint.id, newPointComponent);
+    
+    if (firstItem && firstItem.classList.contains('event--edit')) {
+      render(newPointComponent, listContainer, RenderPosition.AFTEREND);
+    } else {
+      render(newPointComponent, listContainer, RenderPosition.AFTERBEGIN);
+    }
+    
+    // Обновляем информацию о маршруте
+    this._updateTripInfo();
+    
+    this._currentPointId = null;
+  }
+
+  _handleEditDelete() {
     if (!this._currentPointId) return;
+    
+    // Удаляем точку из модели
+    this._tripModel.deletePoint(this._currentPointId);
+    
+    // Удаляем компонент
+    const oldComponent = this._pointComponents.get(this._currentPointId);
+    remove(oldComponent);
+    this._pointComponents.delete(this._currentPointId);
+    
+    // Обновляем информацию о маршруте
+    this._updateTripInfo();
+    
+    this._editComponent = null;
+    this._currentPointId = null;
+  }
+
+  _handleEditClose() {
+    this._closeEditForm();
+  }
+
+  _handleCreateClose() {
+    // Удаляем форму создания
+    remove(this._editComponent);
+    this._editComponent = null;
+    this._currentPointId = null;
+  }
+
+  _closeEditForm() {
+    if (!this._currentPointId) {
+      // Если это форма создания
+      if (this._editComponent) {
+        remove(this._editComponent);
+        this._editComponent = null;
+      }
+      this._currentPointId = null;
+      return;
+    }
     
     const point = this._tripModel.getPointById(this._currentPointId);
     const oldComponent = this._editComponent;
-    const container = oldComponent.element.parentElement;
     
     // Создаем новый компонент точки
     const newPointComponent = new TripPointView({
@@ -135,37 +271,40 @@ export default class TripPresenter {
     });
     
     replace(newPointComponent, oldComponent);
-    
-    // Обновляем Map
     this._pointComponents.set(point.id, newPointComponent);
+    
+    remove(oldComponent);
     this._editComponent = null;
     this._currentPointId = null;
-    
-    // Удаляем старый компонент
-    remove(oldComponent);
   }
 
-  _handleEditSubmit() {
-    // Здесь будет логика сохранения
-    console.log('Submit form');
-    this._closeEditForm();
+  _updateTripInfo() {
+    if (this._tripInfoComponent) {
+      const points = this._tripModel.getPoints();
+      const destinations = this._tripModel.getDestinations();
+      
+      const newTripInfoComponent = new TripInfoView({ points, destinations });
+      replace(newTripInfoComponent, this._tripInfoComponent);
+      this._tripInfoComponent = newTripInfoComponent;
+    }
   }
 
-  _handleEditDelete() {
-    // Здесь будет логика удаления
-    console.log('Delete form');
-    this._closeEditForm();
-  }
-
-  _handleEditClose() {
-    console.log('Close form');
-    this._closeEditForm();
+  _getOffersByType() {
+    const offersByType = {};
+    this._tripModel.getOffers().forEach(group => {
+      offersByType[group.type] = group.offers;
+    });
+    return offersByType;
   }
 
   _handleDocumentKeydown(evt) {
-    if (evt.key === 'Escape' && this._currentPointId) {
+    if (evt.key === 'Escape' && this._editComponent) {
       evt.preventDefault();
-      this._closeEditForm();
+      if (this._currentPointId) {
+        this._closeEditForm();
+      } else {
+        this._handleCreateClose();
+      }
     }
   }
 }
