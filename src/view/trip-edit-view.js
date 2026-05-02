@@ -1,7 +1,7 @@
-import AbstractView from './abstract-view.js';
+import AbstractView from '../framework/view/abstract-view.js';
 
 export default class TripEditView extends AbstractView {
-  constructor({ point, destinations = [], offersByType = {}, onSubmit, onDelete, onClose } = {}) {
+  constructor({ point, destinations = [], offersByType = {}, onSubmit, onDelete, onClose }) {
     super();
     this._point = point;
     this._destinations = destinations;
@@ -9,9 +9,13 @@ export default class TripEditView extends AbstractView {
     this._onSubmit = onSubmit;
     this._onDelete = onDelete;
     this._onClose = onClose;
+    
+    this._handleSubmit = this._handleSubmit.bind(this);
+    this._handleDelete = this._handleDelete.bind(this);
+    this._handleClose = this._handleClose.bind(this);
   }
 
-  getTemplate() {
+  get template() {
     if (!this._point) {
       return this._getEmptyTemplate();
     }
@@ -44,7 +48,7 @@ export default class TripEditView extends AbstractView {
       </section>
     ` : '';
 
-    const destinationHtml = destination.description ? `
+    const destinationHtml = destination && destination.description ? `
       <section class="event__section event__section--destination">
         <h3 class="event__section-title event__section-title--destination">Destination</h3>
         <p class="event__destination-description">${destination.description}</p>
@@ -82,7 +86,7 @@ export default class TripEditView extends AbstractView {
                 id="event-destination-1" 
                 type="text" 
                 name="event-destination" 
-                value="${destination.name || ''}" 
+                value="${destination ? destination.name : ''}" 
                 list="destination-list-1"
               >
               <datalist id="destination-list-1">
@@ -172,5 +176,20 @@ export default class TripEditView extends AbstractView {
 
   _capitalize(str) {
     return str.charAt(0).toUpperCase() + str.slice(1);
+  }
+
+  _handleSubmit(evt) {
+    evt.preventDefault();
+    this._onSubmit();
+  }
+
+  _handleDelete(evt) {
+    evt.preventDefault();
+    this._onDelete();
+  }
+
+  _handleClose(evt) {
+    evt.preventDefault();
+    this._onClose();
   }
 }

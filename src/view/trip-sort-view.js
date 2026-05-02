@@ -1,4 +1,4 @@
-import AbstractView from './abstract-view.js';
+import AbstractView from '../framework/view/abstract-view.js';
 
 export default class TripSortView extends AbstractView {
   constructor({ currentSort = 'day' } = {}) {
@@ -6,7 +6,7 @@ export default class TripSortView extends AbstractView {
     this._currentSort = currentSort;
   }
 
-  getTemplate() {
+  get template() {
     const sorts = [
       { id: 'day', label: 'Day', isDisabled: false },
       { id: 'event', label: 'Event', isDisabled: true },

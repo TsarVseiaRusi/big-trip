@@ -4,6 +4,7 @@ import TripSortView from '../view/trip-sort-view.js';
 import TripListView from '../view/trip-list-view.js';
 import TripPointView from '../view/trip-point-view.js';
 import TripEditView from '../view/trip-edit-view.js';
+import { render, replace, remove, RenderPosition } from '../framework/render.js';
 
 export default class TripPresenter {
   constructor({ tripModel }) {
@@ -13,111 +14,90 @@ export default class TripPresenter {
     this._filtersComponent = null;
     this._sortComponent = null;
     this._listComponent = null;
+    this._pointComponents = new Map(); // Map для хранения компонентов точек
     this._editComponent = null;
-    this._pointComponents = [];
+    this._currentPointId = null; // ID текущей редактируемой точки
   }
 
   init() {
-    console.log('TripPresenter init started');
-    
     this._renderTripInfo();
     this._renderFilters();
     this._renderSort();
     this._renderList();
-    this._renderEditForm();
     this._renderPoints();
     
-    console.log('TripPresenter init completed');
+    // Добавляем глобальные обработчики
+    document.addEventListener('keydown', this._handleDocumentKeydown.bind(this));
   }
 
   _renderTripInfo() {
     const tripMain = document.querySelector('.trip-main');
-    if (!tripMain) {
-      console.error('Trip-main container not found');
-      return;
+    if (tripMain) {
+      const points = this._tripModel.getPoints();
+      const destinations = this._tripModel.getDestinations();
+      
+      this._tripInfoComponent = new TripInfoView({ points, destinations });
+      render(this._tripInfoComponent, tripMain, RenderPosition.AFTERBEGIN);
     }
-    
-    console.log('Rendering TripInfo');
-    const points = this._tripModel.getPoints();
-    const destinations = this._tripModel.getDestinations();
-    
-    this._tripInfoComponent = new TripInfoView({ points, destinations });
-    const element = this._tripInfoComponent.getElement();
-    
-    // Вставляем в начало trip-main
-    tripMain.insertBefore(element, tripMain.firstChild);
-    console.log('TripInfo rendered');
   }
 
   _renderFilters() {
     const filtersContainer = document.querySelector('.trip-controls__filters');
-    if (!filtersContainer) {
-      console.error('Filters container not found');
-      return;
+    if (filtersContainer) {
+      this._filtersComponent = new TripFiltersView({ currentFilter: 'everything' });
+      render(this._filtersComponent, filtersContainer);
     }
-    
-    console.log('Rendering Filters');
-    this._filtersComponent = new TripFiltersView({ currentFilter: 'everything' });
-    const element = this._filtersComponent.getElement();
-    
-    // Очищаем контейнер и добавляем фильтры
-    filtersContainer.innerHTML = '';
-    filtersContainer.appendChild(element);
-    console.log('Filters rendered');
   }
 
   _renderSort() {
     const tripEvents = document.querySelector('.trip-events');
-    if (!tripEvents) {
-      console.error('Trip-events container not found');
-      return;
+    if (tripEvents) {
+      this._sortComponent = new TripSortView({ currentSort: 'day' });
+      render(this._sortComponent, tripEvents, RenderPosition.AFTERBEGIN);
     }
-    
-    console.log('Rendering Sort');
-    this._sortComponent = new TripSortView({ currentSort: 'day' });
-    const element = this._sortComponent.getElement();
-    
-    // Вставляем после заголовка
-    const heading = tripEvents.querySelector('h2');
-    if (heading) {
-      tripEvents.insertBefore(element, heading.nextSibling);
-    } else {
-      tripEvents.insertBefore(element, tripEvents.firstChild);
-    }
-    console.log('Sort rendered');
   }
 
   _renderList() {
     const tripEvents = document.querySelector('.trip-events');
-    if (!tripEvents) {
-      console.error('Trip-events container not found');
-      return;
+    if (tripEvents) {
+      this._listComponent = new TripListView();
+      render(this._listComponent, tripEvents);
     }
-    
-    console.log('Rendering List');
-    this._listComponent = new TripListView();
-    const element = this._listComponent.getElement();
-    
-    tripEvents.appendChild(element);
-    console.log('List container rendered');
   }
 
-  _renderEditForm() {
-    const listContainer = this._listComponent?.getElement();
-    if (!listContainer) {
-      console.error('List container not found');
-      return;
-    }
-    
-    console.log('Rendering Edit Form');
+  _renderPoints() {
     const points = this._tripModel.getPoints();
+    const listContainer = this._listComponent.element;
     
-    if (points.length === 0) {
-      console.log('No points to edit');
-      return;
+    points.forEach(point => {
+      this._renderPoint(point, listContainer);
+    });
+  }
+
+  _renderPoint(point, container) {
+    const pointComponent = new TripPointView({
+      point,
+      onEditClick: () => this._handleEditClick(point.id)
+    });
+    
+    this._pointComponents.set(point.id, pointComponent);
+    render(pointComponent, container);
+  }
+
+  _handleEditClick(pointId) {
+    const point = this._tripModel.getPointById(pointId);
+    if (!point) return;
+    
+    // Закрываем любую открытую форму редактирования
+    if (this._currentPointId) {
+      this._closeEditForm();
     }
     
-    const firstPoint = points[0];
+    this._currentPointId = pointId;
+    this._replacePointToEditForm(point);
+  }
+
+  _replacePointToEditForm(point) {
     const destinations = this._tripModel.getDestinations();
     
     // Создаем объект offersByType
@@ -126,55 +106,66 @@ export default class TripPresenter {
       offersByType[group.type] = group.offers;
     });
 
-    console.log('Creating edit form for point:', firstPoint.id);
+    const oldComponent = this._pointComponents.get(point.id);
+    const container = oldComponent.element.parentElement;
     
     this._editComponent = new TripEditView({
-      point: firstPoint,
+      point,
       destinations,
       offersByType,
-      onSubmit: this._handleFormSubmit.bind(this),
-      onDelete: this._handleFormDelete.bind(this),
-      onClose: this._handleFormClose.bind(this)
+      onSubmit: () => this._handleEditSubmit(),
+      onDelete: () => this._handleEditDelete(),
+      onClose: () => this._handleEditClose()
     });
     
-    const element = this._editComponent.getElement();
-    listContainer.insertBefore(element, listContainer.firstChild);
-    console.log('Edit form rendered');
+    replace(this._editComponent, oldComponent);
   }
 
-  _renderPoints() {
-    const listContainer = this._listComponent?.getElement();
-    if (!listContainer) {
-      console.error('List container not found');
-      return;
+  _closeEditForm() {
+    if (!this._currentPointId) return;
+    
+    const point = this._tripModel.getPointById(this._currentPointId);
+    const oldComponent = this._editComponent;
+    const container = oldComponent.element.parentElement;
+    
+    // Создаем новый компонент точки
+    const newPointComponent = new TripPointView({
+      point,
+      onEditClick: () => this._handleEditClick(point.id)
+    });
+    
+    replace(newPointComponent, oldComponent);
+    
+    // Обновляем Map
+    this._pointComponents.set(point.id, newPointComponent);
+    this._editComponent = null;
+    this._currentPointId = null;
+    
+    // Удаляем старый компонент
+    remove(oldComponent);
+  }
+
+  _handleEditSubmit() {
+    // Здесь будет логика сохранения
+    console.log('Submit form');
+    this._closeEditForm();
+  }
+
+  _handleEditDelete() {
+    // Здесь будет логика удаления
+    console.log('Delete form');
+    this._closeEditForm();
+  }
+
+  _handleEditClose() {
+    console.log('Close form');
+    this._closeEditForm();
+  }
+
+  _handleDocumentKeydown(evt) {
+    if (evt.key === 'Escape' && this._currentPointId) {
+      evt.preventDefault();
+      this._closeEditForm();
     }
-    
-    console.log('Rendering Points');
-    const points = this._tripModel.getPoints();
-    
-    // Пропускаем первую точку
-    const pointsToRender = points.slice(1);
-    console.log(`Rendering ${pointsToRender.length} points`);
-    
-    pointsToRender.forEach((point, index) => {
-      console.log(`Rendering point ${index + 1}:`, point.id);
-      const pointComponent = new TripPointView({ point });
-      this._pointComponents.push(pointComponent);
-      listContainer.appendChild(pointComponent.getElement());
-    });
-    
-    console.log('All points rendered');
-  }
-
-  _handleFormSubmit(pointData) {
-    console.log('Form submitted:', pointData);
-  }
-
-  _handleFormDelete(pointId) {
-    console.log('Form delete:', pointId);
-  }
-
-  _handleFormClose() {
-    console.log('Form closed');
   }
 }
