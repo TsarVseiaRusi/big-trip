@@ -2,8 +2,9 @@ import TripFiltersView from '../view/trip-filters-view.js';
 import { render, replace, remove } from '../framework/render.js';
 
 export default class FilterPresenter {
-  constructor({ filterModel, onFilterChange }) {
+  constructor({ filterModel, pointsModel, onFilterChange }) {
     this._filterModel = filterModel;
+    this._pointsModel = pointsModel;
     this._onFilterChange = onFilterChange;
     this._filterComponent = null;
     this._container = null;
@@ -36,6 +37,8 @@ export default class FilterPresenter {
     if (this._filterModel.getFilter() === filterType) return;
     
     this._filterModel.setFilter('UPDATE', filterType);
-    this._onFilterChange();
+    if (this._onFilterChange) {
+      this._onFilterChange();
+    }
   }
 }
