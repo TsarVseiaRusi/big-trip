@@ -1,43 +1,74 @@
 import Observable from '../framework/observable.js';
-import { enrichPoint } from '../mock/points.js';
 
 export default class PointsModel extends Observable {
-  constructor(points) {
+  constructor(apiService) {
     super();
-    this._points = points.map(point => enrichPoint(point));
+    this._apiService = apiService;
+    this._points = [];
+    this._isLoading = true;
+    this._error = null;
+  }
+
+  async init() {
+    try {
+      const points = await this._apiService.getPoints();
+      this._points = points;
+    } catch (err) {
+      this._error = err;
+      this._points = [];
+    } finally {
+      this._isLoading = false;
+      this._notify('INIT', { isLoading: false, error: this._error });
+    }
   }
 
   getPoints() {
     return this._points;
   }
 
-  setPoints(points) {
-    this._points = points.map(point => enrichPoint(point));
-    this._notify('UPDATE', this._points);
+  get isLoading() {
+    return this._isLoading;
   }
 
-  updatePoint(updatedPoint) {
-    const index = this._points.findIndex(point => point.id === updatedPoint.id);
-    if (index === -1) return false;
-
-    this._points[index] = enrichPoint(updatedPoint);
-    this._notify('UPDATE', this._points);
-    return true;
+  get error() {
+    return this._error;
   }
 
-  addPoint(point) {
-    const newPoint = enrichPoint(point);
-    this._points.push(newPoint);
-    this._notify('ADD', newPoint);
-    return newPoint;
+  async updatePoint(updatedPoint) {
+    try {
+      const response = await this._apiService.updatePoint(updatedPoint);
+      const index = this._points.findIndex(point => point.id === updatedPoint.id);
+      if (index !== -1) {
+        this._points[index] = response;
+        this._notify('UPDATE', response);
+      }
+      return response;
+    } catch (err) {
+      throw new Error('Can\'t update point');
+    }
   }
 
-  deletePoint(pointId) {
-    const index = this._points.findIndex(point => point.id === pointId);
-    if (index === -1) return false;
+  async addPoint(point) {
+    try {
+      const response = await this._apiService.addPoint(point);
+      this._points.push(response);
+      this._notify('ADD', response);
+      return response;
+    } catch (err) {
+      throw new Error('Can\'t add point');
+    }
+  }
 
-    this._points.splice(index, 1);
-    this._notify('DELETE', pointId);
-    return true;
+  async deletePoint(pointId) {
+    try {
+      await this._apiService.deletePoint(pointId);
+      const index = this._points.findIndex(point => point.id === pointId);
+      if (index !== -1) {
+        this._points.splice(index, 1);
+        this._notify('DELETE', pointId);
+      }
+    } catch (err) {
+      throw new Error('Can\'t delete point');
+    }
   }
 }
