@@ -1,4 +1,9 @@
 import AbstractView from '../framework/view/abstract-view.js';
+import dayjs from 'dayjs';
+import duration from 'dayjs/plugin/duration.js';
+
+// Подключаем плагин для работы с длительностью
+dayjs.extend(duration);
 
 export default class TripPointView extends AbstractView {
   constructor({ point, onEditClick }) {
@@ -25,6 +30,7 @@ export default class TripPointView extends AbstractView {
       </ul>
     ` : '';
 
+    // Форматируем дату с помощью dayjs
     const formattedDate = this._formatDate(dateFrom);
     const startTime = this._formatTime(dateFrom);
     const endTime = this._formatTime(dateTo);
@@ -33,7 +39,7 @@ export default class TripPointView extends AbstractView {
     return `
       <li class="trip-events__item">
         <div class="event">
-          <time class="event__date" datetime="${dateFrom.split('T')[0]}">${formattedDate}</time>
+          <time class="event__date" datetime="${dayjs(dateFrom).format('YYYY-MM-DD')}">${formattedDate}</time>
           <div class="event__type">
             <img class="event__type-icon" width="42" height="42" src="img/icons/${type}.png" alt="Event type icon">
           </div>
@@ -64,34 +70,58 @@ export default class TripPointView extends AbstractView {
     `;
   }
 
+  /**
+   * Форматирование даты: "MMM D"
+   * Например: "MAR 18"
+   */
+  _formatDate(dateString) {
+    return dayjs(dateString).format('MMM D').toUpperCase();
+  }
+
+  /**
+   * Форматирование времени: "HH:MM"
+   * Например: "10:30"
+   */
+  _formatTime(timeString) {
+    return dayjs(timeString).format('HH:mm');
+  }
+
+  /**
+   * Расчет продолжительности события
+   * Форматы:
+   * - менее часа: "MMM"
+   * - менее суток: "HHч MMм"
+   * - более суток: "DDд HHч MMм"
+   */
+  _calculateDuration(start, end) {
+    const startDate = dayjs(start);
+    const endDate = dayjs(end);
+    const diffMs = endDate.diff(startDate);
+    
+    const durationObj = dayjs.duration(diffMs);
+    
+    const days = Math.floor(durationObj.asDays());
+    const hours = durationObj.hours();
+    const minutes = durationObj.minutes();
+    
+    const parts = [];
+    
+    if (days > 0) {
+      parts.push(`${days.toString().padStart(2, '0')}D`);
+    }
+    
+    if (hours > 0 || days > 0) {
+      parts.push(`${hours.toString().padStart(2, '0')}H`);
+    }
+    
+    parts.push(`${minutes.toString().padStart(2, '0')}M`);
+    
+    return parts.join(' ');
+  }
+
   _handleEditClick(evt) {
     evt.preventDefault();
     this._onEditClick();
-  }
-
-  _formatDate(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: '2-digit' }).toUpperCase();
-  }
-
-  _formatTime(timeString) {
-    const date = new Date(timeString);
-    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-  }
-
-  _calculateDuration(start, end) {
-    const startDate = new Date(start);
-    const endDate = new Date(end);
-    const diffMs = endDate - startDate;
-    
-    const diffMins = Math.floor(diffMs / 60000);
-    const hours = Math.floor(diffMins / 60);
-    const mins = diffMins % 60;
-    
-    if (hours > 0) {
-      return `${hours.toString().padStart(2, '0')}H ${mins.toString().padStart(2, '0')}M`;
-    }
-    return `${mins}M`;
   }
 
   _capitalize(str) {
