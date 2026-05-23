@@ -7,7 +7,8 @@ import TripPresenter from './presenter/trip-presenter.js';
 import ApiService from './api-service.js';
 
 const AUTHORIZATION = 'Basic bigtrip2024user';
-const END_POINT = 'https://21.objects.pacademy.ru/big-trip';
+// Используем правильный адрес сервера
+const END_POINT = 'https://21.objects.htmlacademy.ru/big-trip';
 
 const apiService = new ApiService(END_POINT, AUTHORIZATION);
 
@@ -19,14 +20,28 @@ const filterModel = new FilterModel();
 const tripContainer = document.querySelector('.trip-events');
 const filtersContainer = document.querySelector('.trip-controls__filters');
 
+// Убеждаемся, что контейнеры существуют
+if (!tripContainer) {
+  console.error('Trip container not found!');
+}
+
+if (!filtersContainer) {
+  console.error('Filters container not found!');
+}
+
 const filterPresenter = new FilterPresenter({
   filterModel,
   pointsModel,
   onFilterChange: () => {
-    tripPresenter._renderPoints();
+    if (tripPresenter && typeof tripPresenter._renderPoints === 'function') {
+      tripPresenter._renderPoints();
+    }
   }
 });
-filterPresenter.init(filtersContainer);
+
+if (filtersContainer) {
+  filterPresenter.init(filtersContainer);
+}
 
 const tripPresenter = new TripPresenter({
   pointsModel,
@@ -34,4 +49,9 @@ const tripPresenter = new TripPresenter({
   destinationsModel,
   offersModel
 });
-tripPresenter.init(tripContainer);
+
+if (tripContainer && tripPresenter && typeof tripPresenter.init === 'function') {
+  tripPresenter.init(tripContainer);
+} else {
+  console.error('TripPresenter init is not a function or container not found');
+}

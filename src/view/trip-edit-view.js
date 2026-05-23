@@ -13,14 +13,13 @@ export default class TripEditView extends AbstractStatefulView {
     this._onDelete = onDelete;
     this._onClose = onClose;
     
-    // Инициализируем состояние
-    this._setState(TripEditView.parsePointToState(point));
-    
-    // Экземпляры flatpickr
     this._datepickerFrom = null;
     this._datepickerTo = null;
+    this._isSaving = false;
+    this._isDeleting = false;
     
-    // Привязываем обработчики
+    this._setState(TripEditView.parsePointToState(point));
+    
     this._handleSubmit = this._handleSubmit.bind(this);
     this._handleDelete = this._handleDelete.bind(this);
     this._handleClose = this._handleClose.bind(this);
@@ -52,6 +51,7 @@ export default class TripEditView extends AbstractStatefulView {
                 name="event-offer-${offer.id}"
                 ${offers.some(o => o.id === offer.id) ? 'checked' : ''}
                 data-offer-id="${offer.id}"
+                ${this._isSaving || this._isDeleting ? 'disabled' : ''}
               >
               <label class="event__offer-label" for="event-offer-${offer.id}-1">
                 <span class="event__offer-title">${offer.title}</span>
@@ -80,6 +80,9 @@ export default class TripEditView extends AbstractStatefulView {
         ` : ''}
       </section>
     ` : '';
+
+    const saveButtonText = this._isSaving ? 'Saving...' : 'Save';
+    const deleteButtonText = this._isDeleting ? 'Deleting...' : (isNewPoint ? 'Cancel' : 'Delete');
 
     return `
       <li class="trip-events__item">
@@ -111,6 +114,7 @@ export default class TripEditView extends AbstractStatefulView {
                 value="${destination || ''}" 
                 list="destination-list-1"
                 autocomplete="off"
+                ${this._isSaving || this._isDeleting ? 'disabled' : ''}
               >
               <datalist id="destination-list-1">
                 ${this._destinations.map(dest => `
@@ -121,10 +125,10 @@ export default class TripEditView extends AbstractStatefulView {
 
             <div class="event__field-group event__field-group--time">
               <label class="visually-hidden" for="event-start-time-1">From</label>
-              <input class="event__input event__input--time" id="event-start-time-1" type="text" name="event-start-time" value="${this._formatDateTime(dateFrom)}" readonly>
+              <input class="event__input event__input--time" id="event-start-time-1" type="text" name="event-start-time" value="${this._formatDateTime(dateFrom)}" readonly ${this._isSaving || this._isDeleting ? 'disabled' : ''}>
               &mdash;
               <label class="visually-hidden" for="event-end-time-1">To</label>
-              <input class="event__input event__input--time" id="event-end-time-1" type="text" name="event-end-time" value="${this._formatDateTime(dateTo)}" readonly>
+              <input class="event__input event__input--time" id="event-end-time-1" type="text" name="event-end-time" value="${this._formatDateTime(dateTo)}" readonly ${this._isSaving || this._isDeleting ? 'disabled' : ''}>
             </div>
 
             <div class="event__field-group event__field-group--price">
@@ -132,12 +136,16 @@ export default class TripEditView extends AbstractStatefulView {
                 <span class="visually-hidden">Price</span>
                 &euro;
               </label>
-              <input class="event__input event__input--price" id="event-price-1" type="text" name="event-price" value="${basePrice || ''}" placeholder="0">
+              <input class="event__input event__input--price" id="event-price-1" type="text" name="event-price" value="${basePrice || ''}" placeholder="0" ${this._isSaving || this._isDeleting ? 'disabled' : ''}>
             </div>
 
-            <button class="event__save-btn btn btn--blue" type="submit">Save</button>
-            <button class="event__reset-btn" type="reset">${isNewPoint ? 'Cancel' : 'Delete'}</button>
-            <button class="event__rollup-btn" type="button">
+            <button class="event__save-btn btn btn--blue" type="submit" ${this._isSaving || this._isDeleting ? 'disabled' : ''}>
+              ${saveButtonText}
+            </button>
+            <button class="event__reset-btn" type="reset" ${this._isSaving || this._isDeleting ? 'disabled' : ''}>
+              ${deleteButtonText}
+            </button>
+            <button class="event__rollup-btn" type="button" ${this._isSaving || this._isDeleting ? 'disabled' : ''}>
               <span class="visually-hidden">Close</span>
             </button>
           </header>
@@ -162,6 +170,7 @@ export default class TripEditView extends AbstractStatefulView {
           name="event-type" 
           value="${type}"
           ${type === currentType ? 'checked' : ''}
+          ${this._isSaving || this._isDeleting ? 'disabled' : ''}
         >
         <label class="event__type-label event__type-label--${type}" for="event-type-${type}-1">
           ${this._capitalize(type)}
@@ -174,76 +183,96 @@ export default class TripEditView extends AbstractStatefulView {
     return this._destinations.find(dest => dest.name === name);
   }
 
-  /**
-   * Форматирование даты и времени для отображения в поле ввода
-   * Формат: "DD/MM/YY HH:MM"
-   */
   _formatDateTime(dateTimeString) {
-    return dayjs(dateTimeString).format('DD/MM/YY HH:mm');
-  }
-
-  /**
-   * Парсинг даты из строки формата "DD/MM/YY HH:mm"
-   */
-  _parseDateTime(dateTimeString) {
-    return dayjs(dateTimeString, 'DD/MM/YY HH:mm').toISOString();
+    const date = new Date(dateTimeString);
+    return date.toLocaleDateString('en-GB', { 
+      day: '2-digit', 
+      month: '2-digit', 
+      year: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false 
+    }).replace(',', '');
   }
 
   _capitalize(str) {
     return str.charAt(0).toUpperCase() + str.slice(1);
   }
 
-  _handleSubmit(evt) {
+  setSavingState(isSaving) {
+    this._isSaving = isSaving;
+    this.updateElement({});
+  }
+
+  setDeletingState(isDeleting) {
+    this._isDeleting = isDeleting;
+    this.updateElement({});
+  }
+
+  async _handleSubmit(evt) {
     evt.preventDefault();
     
-    // Валидация цены
     const price = parseInt(this._state.basePrice, 10);
     if (isNaN(price) || price < 0) {
       this.shake();
       return;
     }
     
-    // Валидация направления
     if (!this._state.destination || this._state.destination.trim() === '') {
       this.shake();
       return;
     }
     
-    this._onSubmit(TripEditView.parseStateToPoint(this._state));
+    this.setSavingState(true);
+    
+    try {
+      await this._onSubmit(TripEditView.parseStateToPoint(this._state));
+    } catch (err) {
+      this.setSavingState(false);
+      this.shake();
+    }
   }
 
-  _handleDelete(evt) {
+  async _handleDelete(evt) {
     evt.preventDefault();
-    if (this._onDelete) {
-      this._onDelete(this._state.id);
+    
+    const isNewPoint = !this._state.id || this._state.id.startsWith('temp-');
+    
+    if (isNewPoint) {
+      this._onClose();
+      return;
+    }
+    
+    this.setDeletingState(true);
+    
+    try {
+      await this._onDelete(this._state.id);
+    } catch (err) {
+      this.setDeletingState(false);
+      this.shake();
     }
   }
 
   _handleClose(evt) {
     evt.preventDefault();
-    if (this._onClose) {
-      this._onClose();
-    }
+    this._onClose();
   }
 
   _handleTypeChange(evt) {
     const newType = evt.target.value;
     if (newType === this._state.type) return;
     
-    // Обновляем иконку в заголовке
     const typeIcon = this.element.querySelector('.event__type-icon');
     if (typeIcon) {
       typeIcon.src = `img/icons/${newType}.png`;
       typeIcon.alt = `Event type icon`;
     }
     
-    // Обновляем текст в label
     const typeOutput = this.element.querySelector('.event__type-output');
     if (typeOutput) {
       typeOutput.textContent = this._capitalize(newType);
     }
     
-    // Обновляем состояние и сбрасываем опции
     this.updateElement({
       type: newType,
       offers: []
@@ -261,7 +290,6 @@ export default class TripEditView extends AbstractStatefulView {
 
   _handlePriceChange(evt) {
     const newPrice = evt.target.value;
-    // Разрешаем только цифры
     const numericValue = newPrice.replace(/[^\d]/g, '');
     
     this.updateElement({
@@ -291,10 +319,9 @@ export default class TripEditView extends AbstractStatefulView {
     });
   }
 
-  /**
-   * Инициализация flatpickr для выбора даты и времени
-   */
   _initDatepickers() {
+    if (this._isSaving || this._isDeleting) return;
+    
     const dateFromInput = this.element.querySelector('#event-start-time-1');
     const dateToInput = this.element.querySelector('#event-end-time-1');
     
@@ -306,7 +333,6 @@ export default class TripEditView extends AbstractStatefulView {
         onChange: ([selectedDate]) => {
           if (selectedDate) {
             const newDateFrom = selectedDate.toISOString();
-            // Если дата начала позже даты окончания, обновляем дату окончания
             if (dayjs(newDateFrom).isAfter(dayjs(this._state.dateTo))) {
               const newDateTo = dayjs(newDateFrom).add(1, 'hour').toISOString();
               this.updateElement({
@@ -332,7 +358,6 @@ export default class TripEditView extends AbstractStatefulView {
         onChange: ([selectedDate]) => {
           if (selectedDate) {
             const newDateTo = selectedDate.toISOString();
-            // Если дата окончания раньше даты начала, обновляем дату начала
             if (dayjs(newDateTo).isBefore(dayjs(this._state.dateFrom))) {
               const newDateFrom = dayjs(newDateTo).subtract(1, 'hour').toISOString();
               this.updateElement({
@@ -351,80 +376,65 @@ export default class TripEditView extends AbstractStatefulView {
     }
   }
 
-  /**
-   * Обновление значений в flatpickr при изменении состояния
-   */
   _updateDatepickers() {
-    if (this._datepickerFrom) {
+    if (this._datepickerFrom && !this._isSaving && !this._isDeleting) {
       this._datepickerFrom.setDate(dayjs(this._state.dateFrom).toDate());
     }
-    if (this._datepickerTo) {
+    if (this._datepickerTo && !this._isSaving && !this._isDeleting) {
       this._datepickerTo.setDate(dayjs(this._state.dateTo).toDate());
     }
   }
 
   _restoreHandlers() {
-    // Восстанавливаем обработчик отправки формы
     const form = this.element.querySelector('.event--edit');
     if (form) {
       form.addEventListener('submit', this._handleSubmit);
     }
     
-    // Восстанавливаем обработчик кнопки Delete/Cancel
     const resetBtn = this.element.querySelector('.event__reset-btn');
     if (resetBtn) {
       resetBtn.addEventListener('click', this._handleDelete);
     }
     
-    // Восстанавливаем обработчик кнопки Close
     const closeBtn = this.element.querySelector('.event__rollup-btn');
     if (closeBtn) {
       closeBtn.addEventListener('click', this._handleClose);
     }
     
-    // Восстанавливаем обработчики для изменения типа
     const typeInputs = this.element.querySelectorAll('.event__type-input');
     typeInputs.forEach(input => {
       input.removeEventListener('change', this._handleTypeChange);
       input.addEventListener('change', this._handleTypeChange);
     });
     
-    // Восстанавливаем обработчик для изменения направления
     const destinationInput = this.element.querySelector('.event__input--destination');
     if (destinationInput) {
       destinationInput.removeEventListener('change', this._handleDestinationChange);
       destinationInput.addEventListener('change', this._handleDestinationChange);
     }
     
-    // Восстанавливаем обработчик для изменения цены
     const priceInput = this.element.querySelector('.event__input--price');
     if (priceInput) {
       priceInput.removeEventListener('input', this._handlePriceChange);
       priceInput.addEventListener('input', this._handlePriceChange);
     }
     
-    // Восстанавливаем обработчики для изменения опций
     const offerCheckboxes = this.element.querySelectorAll('.event__offer-checkbox');
     offerCheckboxes.forEach(checkbox => {
       checkbox.removeEventListener('change', this._handleOfferChange);
       checkbox.addEventListener('change', this._handleOfferChange);
     });
     
-    // Инициализируем datepickers
-    this._initDatepickers();
+    if (!this._isSaving && !this._isDeleting) {
+      this._initDatepickers();
+    }
   }
 
-  /**
-   * Переопределяем метод updateElement для обновления datepicker
-   */
   updateElement(update) {
     super.updateElement(update);
     this._updateDatepickers();
   }
 
-  /**
-   * Удаляем datepickers при удалении компонента
-   */
   removeElement() {
     if (this._datepickerFrom) {
       this._datepickerFrom.destroy();
@@ -437,11 +447,6 @@ export default class TripEditView extends AbstractStatefulView {
     super.removeElement();
   }
 
-  /**
-   * Статический метод для преобразования точки маршрута в состояние
-   * @param {Object} point - точка маршрута
-   * @returns {Object} состояние
-   */
   static parsePointToState(point) {
     return {
       id: point.id,
@@ -455,11 +460,6 @@ export default class TripEditView extends AbstractStatefulView {
     };
   }
 
-  /**
-   * Статический метод для преобразования состояния в точку маршрута
-   * @param {Object} state - состояние
-   * @returns {Object} точка маршрута
-   */
   static parseStateToPoint(state) {
     return {
       id: state.id,

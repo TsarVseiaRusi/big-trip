@@ -9,6 +9,7 @@ import ErrorView from '../view/error-view.js';
 import { render, replace, remove, RenderPosition } from '../framework/render.js';
 import { filter } from '../utils/filter.js';
 import { SortType, sort } from '../utils/sort.js';
+import UiBlocker from '../framework/ui-blocker/ui-blocker.js';
 
 export default class TripPresenter {
   constructor({ pointsModel, filterModel, destinationsModel, offersModel }) {
@@ -26,11 +27,14 @@ export default class TripPresenter {
     this._errorComponent = null;
     this._currentPointId = null;
     this._currentSortType = SortType.DAY;
-    this._isLoading = true;
-    this._isError = false;
     
     this._handleModelEvent = this._handleModelEvent.bind(this);
     this._handleNewEventClick = this._handleNewEventClick.bind(this);
+    
+    this._uiBlocker = new UiBlocker({
+      lowerLimit: 500,
+      upperLimit: 1000
+    });
     
     this._pointsModel.addObserver(this._handleModelEvent);
     this._filterModel.addObserver(this._handleModelEvent);
@@ -51,9 +55,6 @@ export default class TripPresenter {
       this._destinationsModel.init(),
       this._offersModel.init()
     ]);
-    
-    this._isLoading = this._pointsModel.isLoading || this._destinationsModel.isLoading || this._offersModel.isLoading;
-    this._isError = this._pointsModel.error || this._destinationsModel.error || this._offersModel.error;
     
     this._renderPoints();
     
@@ -98,12 +99,12 @@ export default class TripPresenter {
   }
 
   _renderPoints() {
-    if (this._isLoading) {
+    if (this._pointsModel.isLoading) {
       this._renderLoading();
       return;
     }
     
-    if (this._isError) {
+    if (this._pointsModel.error) {
       this._renderError();
       return;
     }
@@ -112,7 +113,6 @@ export default class TripPresenter {
     
     const points = this._getSortedPoints();
     const destinations = this._destinationsModel.getDestinations();
-    const offersByType = this._getOffersByType();
     
     if (points.length === 0) {
       this._renderEmptyMessage();
@@ -126,13 +126,13 @@ export default class TripPresenter {
     }));
     
     enrichedPoints.forEach(point => {
-      this._renderPoint(point, offersByType);
+      this._renderPoint(point);
     });
     
     this._updateTripInfo();
   }
 
-  _renderPoint(point, offersByType) {
+  _renderPoint(point) {
     const listContainer = this._listComponent.element;
     
     const pointComponent = new TripPointView({
@@ -288,20 +288,28 @@ export default class TripPresenter {
       isFavorite: this._pointsModel.getPoints().find(p => p.id === this._currentPointId)?.isFavorite || false
     };
     
+    this._uiBlocker.block();
+    
     try {
       await this._pointsModel.updatePoint(pointToUpdate);
       this._closeEditForm();
     } catch (err) {
       this._editComponent.shake();
+    } finally {
+      this._uiBlocker.unblock();
     }
   }
 
   async _handleEditDelete() {
+    this._uiBlocker.block();
+    
     try {
       await this._pointsModel.deletePoint(this._currentPointId);
       this._closeEditForm();
     } catch (err) {
       this._editComponent.shake();
+    } finally {
+      this._uiBlocker.unblock();
     }
   }
 
@@ -365,11 +373,15 @@ export default class TripPresenter {
       isFavorite: false
     };
     
+    this._uiBlocker.block();
+    
     try {
       await this._pointsModel.addPoint(pointToAdd);
       this._closeEditForm();
     } catch (err) {
       this._editComponent.shake();
+    } finally {
+      this._uiBlocker.unblock();
     }
   }
 
