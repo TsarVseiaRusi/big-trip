@@ -1,10 +1,11 @@
 import AbstractView from '../framework/view/abstract-view.js';
 
 export default class TripFiltersView extends AbstractView {
-  constructor({ currentFilter = 'everything', isDisabled = false } = {}) {
+  constructor({ currentFilter, onFilterChange }) {
     super();
     this._currentFilter = currentFilter;
-    this._isDisabled = isDisabled;
+    this._onFilterChange = onFilterChange;
+    this._handleFilterChange = this._handleFilterChange.bind(this);
   }
 
   get template() {
@@ -24,7 +25,6 @@ export default class TripFiltersView extends AbstractView {
           name="trip-filter" 
           value="${filter.id}"
           ${this._currentFilter === filter.id ? 'checked' : ''}
-          ${this._isDisabled ? 'disabled' : ''}
         >
         <label class="trip-filters__filter-label" for="filter-${filter.id}">
           ${filter.label}
@@ -38,5 +38,13 @@ export default class TripFiltersView extends AbstractView {
         <button class="visually-hidden" type="submit">Accept filter</button>
       </form>
     `;
+  }
+
+  _handleFilterChange(evt) {
+    evt.preventDefault();
+    const filterInput = evt.target.closest('.trip-filters__filter')?.querySelector('.trip-filters__filter-input');
+    if (filterInput && filterInput.checked) {
+      this._onFilterChange(filterInput.value);
+    }
   }
 }
