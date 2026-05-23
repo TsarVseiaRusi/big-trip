@@ -1,4 +1,7 @@
 import AbstractStatefulView from '../framework/view/abstract-stateful-view.js';
+import flatpickr from 'flatpickr';
+import 'flatpickr/dist/flatpickr.min.css';
+import dayjs from 'dayjs';
 
 export default class TripEditView extends AbstractStatefulView {
   constructor({ point, destinations = [], offersByType = {}, onSubmit, onDelete, onClose }) {
@@ -12,6 +15,10 @@ export default class TripEditView extends AbstractStatefulView {
     
     // Инициализируем состояние
     this._setState(TripEditView.parsePointToState(point));
+    
+    // Экземпляры flatpickr
+    this._datepickerFrom = null;
+    this._datepickerTo = null;
     
     // Привязываем обработчики
     this._handleSubmit = this._handleSubmit.bind(this);
@@ -114,10 +121,10 @@ export default class TripEditView extends AbstractStatefulView {
 
             <div class="event__field-group event__field-group--time">
               <label class="visually-hidden" for="event-start-time-1">From</label>
-              <input class="event__input event__input--time" id="event-start-time-1" type="text" name="event-start-time" value="${this._formatDateTime(dateFrom)}">
+              <input class="event__input event__input--time" id="event-start-time-1" type="text" name="event-start-time" value="${this._formatDateTime(dateFrom)}" readonly>
               &mdash;
               <label class="visually-hidden" for="event-end-time-1">To</label>
-              <input class="event__input event__input--time" id="event-end-time-1" type="text" name="event-end-time" value="${this._formatDateTime(dateTo)}">
+              <input class="event__input event__input--time" id="event-end-time-1" type="text" name="event-end-time" value="${this._formatDateTime(dateTo)}" readonly>
             </div>
 
             <div class="event__field-group event__field-group--price">
@@ -167,16 +174,19 @@ export default class TripEditView extends AbstractStatefulView {
     return this._destinations.find(dest => dest.name === name);
   }
 
+  /**
+   * Форматирование даты и времени для отображения в поле ввода
+   * Формат: "DD/MM/YY HH:MM"
+   */
   _formatDateTime(dateTimeString) {
-    const date = new Date(dateTimeString);
-    return date.toLocaleDateString('en-GB', { 
-      day: '2-digit', 
-      month: '2-digit', 
-      year: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false 
-    }).replace(',', '');
+    return dayjs(dateTimeString).format('DD/MM/YY HH:mm');
+  }
+
+  /**
+   * Парсинг даты из строки формата "DD/MM/YY HH:mm"
+   */
+  _parseDateTime(dateTimeString) {
+    return dayjs(dateTimeString, 'DD/MM/YY HH:mm').toISOString();
   }
 
   _capitalize(str) {
@@ -220,21 +230,20 @@ export default class TripEditView extends AbstractStatefulView {
     const newType = evt.target.value;
     if (newType === this._state.type) return;
     
-    // При смене типа:
-    // 1. Обновляем иконку в заголовке
+    // Обновляем иконку в заголовке
     const typeIcon = this.element.querySelector('.event__type-icon');
     if (typeIcon) {
       typeIcon.src = `img/icons/${newType}.png`;
       typeIcon.alt = `Event type icon`;
     }
     
-    // 2. Обновляем текст в label
+    // Обновляем текст в label
     const typeOutput = this.element.querySelector('.event__type-output');
     if (typeOutput) {
       typeOutput.textContent = this._capitalize(newType);
     }
     
-    // 3. Обновляем состояние и сбрасываем опции
+    // Обновляем состояние и сбрасываем опции
     this.updateElement({
       type: newType,
       offers: []
@@ -280,6 +289,78 @@ export default class TripEditView extends AbstractStatefulView {
     this.updateElement({
       offers: updatedOffers
     });
+  }
+
+  /**
+   * Инициализация flatpickr для выбора даты и времени
+   */
+  _initDatepickers() {
+    const dateFromInput = this.element.querySelector('#event-start-time-1');
+    const dateToInput = this.element.querySelector('#event-end-time-1');
+    
+    if (dateFromInput && !this._datepickerFrom) {
+      this._datepickerFrom = flatpickr(dateFromInput, {
+        enableTime: true,
+        dateFormat: 'd/m/y H:i',
+        defaultDate: dayjs(this._state.dateFrom).toDate(),
+        onChange: ([selectedDate]) => {
+          if (selectedDate) {
+            const newDateFrom = selectedDate.toISOString();
+            // Если дата начала позже даты окончания, обновляем дату окончания
+            if (dayjs(newDateFrom).isAfter(dayjs(this._state.dateTo))) {
+              const newDateTo = dayjs(newDateFrom).add(1, 'hour').toISOString();
+              this.updateElement({
+                dateFrom: newDateFrom,
+                dateTo: newDateTo
+              });
+              if (this._datepickerTo) {
+                this._datepickerTo.setDate(dayjs(newDateTo).toDate());
+              }
+            } else {
+              this.updateElement({ dateFrom: newDateFrom });
+            }
+          }
+        }
+      });
+    }
+    
+    if (dateToInput && !this._datepickerTo) {
+      this._datepickerTo = flatpickr(dateToInput, {
+        enableTime: true,
+        dateFormat: 'd/m/y H:i',
+        defaultDate: dayjs(this._state.dateTo).toDate(),
+        onChange: ([selectedDate]) => {
+          if (selectedDate) {
+            const newDateTo = selectedDate.toISOString();
+            // Если дата окончания раньше даты начала, обновляем дату начала
+            if (dayjs(newDateTo).isBefore(dayjs(this._state.dateFrom))) {
+              const newDateFrom = dayjs(newDateTo).subtract(1, 'hour').toISOString();
+              this.updateElement({
+                dateFrom: newDateFrom,
+                dateTo: newDateTo
+              });
+              if (this._datepickerFrom) {
+                this._datepickerFrom.setDate(dayjs(newDateFrom).toDate());
+              }
+            } else {
+              this.updateElement({ dateTo: newDateTo });
+            }
+          }
+        }
+      });
+    }
+  }
+
+  /**
+   * Обновление значений в flatpickr при изменении состояния
+   */
+  _updateDatepickers() {
+    if (this._datepickerFrom) {
+      this._datepickerFrom.setDate(dayjs(this._state.dateFrom).toDate());
+    }
+    if (this._datepickerTo) {
+      this._datepickerTo.setDate(dayjs(this._state.dateTo).toDate());
+    }
   }
 
   _restoreHandlers() {
@@ -328,6 +409,32 @@ export default class TripEditView extends AbstractStatefulView {
       checkbox.removeEventListener('change', this._handleOfferChange);
       checkbox.addEventListener('change', this._handleOfferChange);
     });
+    
+    // Инициализируем datepickers
+    this._initDatepickers();
+  }
+
+  /**
+   * Переопределяем метод updateElement для обновления datepicker
+   */
+  updateElement(update) {
+    super.updateElement(update);
+    this._updateDatepickers();
+  }
+
+  /**
+   * Удаляем datepickers при удалении компонента
+   */
+  removeElement() {
+    if (this._datepickerFrom) {
+      this._datepickerFrom.destroy();
+      this._datepickerFrom = null;
+    }
+    if (this._datepickerTo) {
+      this._datepickerTo.destroy();
+      this._datepickerTo = null;
+    }
+    super.removeElement();
   }
 
   /**
