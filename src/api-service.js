@@ -2,48 +2,27 @@
  * Класс для отправки запросов к серверу
  */
 export default class ApiService {
-  /**
-   * @param {string} endPoint Адрес сервера
-   * @param {string} authorization Авторизационный токен
-   */
   constructor(endPoint, authorization) {
     this._endPoint = endPoint;
     this._authorization = authorization;
   }
 
-  /**
-   * Получение всех точек маршрута
-   * @returns {Promise<Array>}
-   */
   async getPoints() {
-    return this._load({ url: 'points' })
-      .then(ApiService.parseResponse)
-      .then((points) => points.map(ApiService.adaptPointToClient));
+    const response = await this._load({ url: 'points' });
+    const points = await ApiService.parseResponse(response);
+    return points.map(ApiService.adaptPointToClient);
   }
 
-  /**
-   * Получение всех направлений
-   * @returns {Promise<Array>}
-   */
   async getDestinations() {
-    return this._load({ url: 'destinations' })
-      .then(ApiService.parseResponse);
+    const response = await this._load({ url: 'destinations' });
+    return await ApiService.parseResponse(response);
   }
 
-  /**
-   * Получение всех опций
-   * @returns {Promise<Array>}
-   */
   async getOffers() {
-    return this._load({ url: 'offers' })
-      .then(ApiService.parseResponse);
+    const response = await this._load({ url: 'offers' });
+    return await ApiService.parseResponse(response);
   }
 
-  /**
-   * Обновление точки маршрута
-   * @param {Object} point
-   * @returns {Promise<Object>}
-   */
   async updatePoint(point) {
     const adaptedPoint = ApiService.adaptPointToServer(point);
     const response = await this._load({
@@ -56,11 +35,6 @@ export default class ApiService {
     return ApiService.adaptPointToClient(parsedResponse);
   }
 
-  /**
-   * Добавление новой точки маршрута
-   * @param {Object} point
-   * @returns {Promise<Object>}
-   */
   async addPoint(point) {
     const adaptedPoint = ApiService.adaptPointToServer(point);
     const response = await this._load({
@@ -73,11 +47,6 @@ export default class ApiService {
     return ApiService.adaptPointToClient(parsedResponse);
   }
 
-  /**
-   * Удаление точки маршрута
-   * @param {string} pointId
-   * @returns {Promise<void>}
-   */
   async deletePoint(pointId) {
     return this._load({
       url: `points/${pointId}`,
@@ -85,37 +54,18 @@ export default class ApiService {
     });
   }
 
-  /**
-   * Метод для отправки запроса к серверу
-   * @param {Object} config Объект с настройками
-   * @returns {Promise<Response>}
-   */
-  async _load({
-    url,
-    method = 'GET',
-    body = null,
-    headers = new Headers(),
-  }) {
+  async _load({ url, method = 'GET', body = null, headers = new Headers() }) {
     headers.append('Authorization', this._authorization);
 
-    const response = await fetch(
-      `${this._endPoint}/${url}`,
-      { method, body, headers },
-    );
+    const response = await fetch(`${this._endPoint}/${url}`, { method, body, headers });
 
-    try {
-      ApiService.checkStatus(response);
-      return response;
-    } catch (err) {
-      ApiService.catchError(err);
+    if (!response.ok) {
+      throw new Error(`${response.status}: ${response.statusText}`);
     }
+
+    return response;
   }
 
-  /**
-   * Адаптер: преобразует данные точки с сервера во внутренний формат
-   * @param {Object} point
-   * @returns {Object}
-   */
   static adaptPointToClient(point) {
     const adaptedPoint = {
       id: point.id,
@@ -130,11 +80,6 @@ export default class ApiService {
     return adaptedPoint;
   }
 
-  /**
-   * Адаптер: преобразует данные точки из внутреннего формата в формат сервера
-   * @param {Object} point
-   * @returns {Object}
-   */
   static adaptPointToServer(point) {
     const adaptedPoint = {
       id: point.id,
@@ -149,30 +94,7 @@ export default class ApiService {
     return adaptedPoint;
   }
 
-  /**
-   * Метод для обработки ответа
-   * @param {Response} response Объект ответа
-   * @returns {Promise}
-   */
   static parseResponse(response) {
     return response.json();
-  }
-
-  /**
-   * Метод для проверки ответа
-   * @param {Response} response Объект ответа
-   */
-  static checkStatus(response) {
-    if (!response.ok) {
-      throw new Error(`${response.status}: ${response.statusText}`);
-    }
-  }
-
-  /**
-   * Метод для обработки ошибок
-   * @param {Error} err Объект ошибки
-   */
-  static catchError(err) {
-    throw err;
   }
 }
