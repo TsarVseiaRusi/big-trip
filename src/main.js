@@ -1,57 +1,57 @@
+import Presenter from './presenter.js';
 import PointsModel from './model/points-model.js';
 import FilterModel from './model/filter-model.js';
-import DestinationsModel from './model/destinations-model.js';
-import OffersModel from './model/offers-model.js';
-import FilterPresenter from './presenter/filter-presenter.js';
-import TripPresenter from './presenter/trip-presenter.js';
-import ApiService from './api-service.js';
+import FiltersPresenter from './presenter/filters-presenter.js';
+import ApiService from './api/api-service.js';
 
+const END_POINT = 'https://24.objects.htmlacademy.pro/big-trip';
 const AUTHORIZATION = 'Basic bigtrip2024user';
-// Используем правильный адрес сервера
-const END_POINT = 'https://21.objects.htmlacademy.ru/big-trip';
 
-const apiService = new ApiService(END_POINT, AUTHORIZATION);
+const apiService = new ApiService({
+  endPoint: END_POINT,
+  authorization: AUTHORIZATION,
+});
 
-const pointsModel = new PointsModel(apiService);
-const destinationsModel = new DestinationsModel(apiService);
-const offersModel = new OffersModel(apiService);
+const pointsModel = new PointsModel({
+  apiService,
+  points: [],
+  destinations: [],
+  offersByType: {},
+});
+
 const filterModel = new FilterModel();
 
-const tripContainer = document.querySelector('.trip-events');
-const filtersContainer = document.querySelector('.trip-controls__filters');
+const presenter = new Presenter({pointsModel, filterModel});
 
-// Убеждаемся, что контейнеры существуют
-if (!tripContainer) {
-  console.error('Trip container not found!');
-}
-
-if (!filtersContainer) {
-  console.error('Filters container not found!');
-}
-
-const filterPresenter = new FilterPresenter({
-  filterModel,
-  pointsModel,
-  onFilterChange: () => {
-    if (tripPresenter && typeof tripPresenter._renderPoints === 'function') {
-      tripPresenter._renderPoints();
-    }
-  }
-});
-
-if (filtersContainer) {
-  filterPresenter.init(filtersContainer);
-}
-
-const tripPresenter = new TripPresenter({
+const filtersPresenter = new FiltersPresenter({
+  filtersContainer: document.querySelector('.trip-controls__filters'),
   pointsModel,
   filterModel,
-  destinationsModel,
-  offersModel
+  onFilterChange: presenter.onFilterChange,
 });
 
-if (tripContainer && tripPresenter && typeof tripPresenter.init === 'function') {
-  tripPresenter.init(tripContainer);
-} else {
-  console.error('TripPresenter init is not a function or container not found');
-}
+filtersPresenter.init();
+presenter.setFiltersPresenter(filtersPresenter);
+
+presenter.setLoading();
+presenter.init();
+
+Promise.all([
+  apiService.getPoints(),
+  apiService.getDestinations(),
+  apiService.getOffers(),
+])
+  .then(([points, destinations, offersByType]) => {
+    pointsModel.setPoints(points);
+    pointsModel.setDestinations(destinations);
+    pointsModel.setOffersByType(offersByType);
+
+    filtersPresenter.init();
+
+    presenter.setReady();
+    presenter.init();
+  })
+  .catch(() => {
+    presenter.setError();
+    presenter.init();
+  });

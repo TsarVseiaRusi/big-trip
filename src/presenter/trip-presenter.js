@@ -27,9 +27,11 @@ export default class TripPresenter {
     this._errorComponent = null;
     this._currentPointId = null;
     this._currentSortType = SortType.DAY;
+    this._isLoading = true;
     
     this._handleModelEvent = this._handleModelEvent.bind(this);
     this._handleNewEventClick = this._handleNewEventClick.bind(this);
+    this._handleDocumentKeydown = this._handleDocumentKeydown.bind(this);
     
     this._uiBlocker = new UiBlocker({
       lowerLimit: 500,
@@ -56,15 +58,28 @@ export default class TripPresenter {
       this._offersModel.init()
     ]);
     
+    this._isLoading = false;
     this._renderPoints();
     
+    // Навешиваем обработчик на кнопку New event
+    this._initAddButton();
+    
+    document.addEventListener('keydown', this._handleDocumentKeydown);
+  }
+
+  _initAddButton() {
     const addButton = document.querySelector('.trip-main__event-add-btn');
     if (addButton) {
+      // Убираем старый обработчик, если есть
       addButton.removeEventListener('click', this._handleNewEventClick);
+      // Добавляем новый
       addButton.addEventListener('click', this._handleNewEventClick);
+      // Разблокируем кнопку, если она заблокирована
+      addButton.disabled = false;
+      console.log('Add button initialized');
+    } else {
+      console.error('Add button not found');
     }
-    
-    document.addEventListener('keydown', this._handleDocumentKeydown.bind(this));
   }
 
   _handleModelEvent() {
@@ -99,7 +114,7 @@ export default class TripPresenter {
   }
 
   _renderPoints() {
-    if (this._pointsModel.isLoading) {
+    if (this._isLoading || this._pointsModel.isLoading) {
       this._renderLoading();
       return;
     }
@@ -146,7 +161,9 @@ export default class TripPresenter {
 
   _clearPointsList() {
     const listContainer = this._listComponent.element;
-    listContainer.innerHTML = '';
+    if (listContainer) {
+      listContainer.innerHTML = '';
+    }
     this._pointComponents.clear();
     
     if (this._loadingComponent) {
@@ -294,7 +311,9 @@ export default class TripPresenter {
       await this._pointsModel.updatePoint(pointToUpdate);
       this._closeEditForm();
     } catch (err) {
-      this._editComponent.shake();
+      if (this._editComponent) {
+        this._editComponent.shake();
+      }
     } finally {
       this._uiBlocker.unblock();
     }
@@ -307,7 +326,9 @@ export default class TripPresenter {
       await this._pointsModel.deletePoint(this._currentPointId);
       this._closeEditForm();
     } catch (err) {
-      this._editComponent.shake();
+      if (this._editComponent) {
+        this._editComponent.shake();
+      }
     } finally {
       this._uiBlocker.unblock();
     }
@@ -318,18 +339,26 @@ export default class TripPresenter {
   }
 
   async _handleNewEventClick() {
+    console.log('New event button clicked');
+    
+    // Закрываем любую открытую форму
     if (this._editComponent) {
       this._closeEditForm();
     }
     
+    // Сбрасываем фильтр на "everything"
     this._filterModel.setFilter('UPDATE', 'everything');
     this._currentSortType = SortType.DAY;
+    
+    // Очищаем список точек
+    this._clearPointsList();
     
     this._currentPointId = null;
     await this._renderCreateForm();
   }
 
   async _renderCreateForm() {
+    console.log('Rendering create form');
     const destinations = this._destinationsModel.getDestinations();
     const offersByType = this._getOffersByType();
     const now = dayjs();
@@ -355,11 +384,14 @@ export default class TripPresenter {
     });
     
     const listContainer = this._listComponent.element;
-    listContainer.innerHTML = '';
-    render(this._editComponent, listContainer);
+    if (listContainer) {
+      listContainer.innerHTML = '';
+      render(this._editComponent, listContainer);
+    }
   }
 
   async _handleCreateSubmit(newPoint) {
+    console.log('Create submit:', newPoint);
     const destinations = this._destinationsModel.getDestinations();
     const destination = destinations.find(d => d.name === newPoint.destination);
     
@@ -379,13 +411,17 @@ export default class TripPresenter {
       await this._pointsModel.addPoint(pointToAdd);
       this._closeEditForm();
     } catch (err) {
-      this._editComponent.shake();
+      console.error('Create error:', err);
+      if (this._editComponent) {
+        this._editComponent.shake();
+      }
     } finally {
       this._uiBlocker.unblock();
     }
   }
 
   _handleCreateClose() {
+    console.log('Create close');
     this._closeEditForm();
     this._renderPoints();
   }

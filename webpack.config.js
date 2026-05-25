@@ -1,47 +1,44 @@
 const path = require('path');
-const CopyPlugin = require('copy-webpack-plugin');
-const HtmlPlugin = require('html-webpack-plugin');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
+const HtmlWebpackPlugin = require('html-webpack-plugin');
 
 module.exports = {
-  entry: './src/main.js', // Точка входа
+  entry: './src/main.js',
+
   output: {
-    filename: 'bundle.[contenthash].js', // Имя бандла
-    path: path.resolve(__dirname, 'build'), // Директория для файлов сборки
-    clean: true, // Удаляем предыдущую сборку перед созданием новой
+    filename: 'bundle.[contenthash].js',
+    path: path.resolve(__dirname, 'build'),
+    clean: true,
   },
-  devtool: 'source-map', // Генерируем карту исходного кода
-  plugins: [
-    new HtmlPlugin({
-      template: 'public/index.html',
-    }),
-    new CopyPlugin({
-      patterns: [
-        {
-          from: 'public',
-          to: '.gitignore',
-          globOptions: {
-            ignore: ['**/index.html'],
-          },
-        },
-      ],
-    }),
-  ],
+
+  devtool: 'source-map',
+
+  devServer: {
+    static: path.resolve(__dirname, 'build'),
+  },
+
   module: {
-    rules: [ 
+    rules: [
       {
         test: /\.js$/,
-        exclude: /(node_modules)/,
-        use: {
-          loader: 'babel-loader',
-          options: {
-            presets: ['@babel/preset-env']
-          },
-        },
+        exclude: /node_modules/,
+        use: 'babel-loader',
       },
       {
-        test: /\.css$/i,
-        use: ['style-loader', 'css-loader']
+        test: /\.css$/,
+        use: ['style-loader', 'css-loader'],
       },
     ],
   },
+
+  plugins: [
+    new CopyWebpackPlugin({
+      patterns: [
+        { from: 'public', to: '.', globOptions: { ignore: ['**/index.html'] } },
+      ],
+    }),
+    new HtmlWebpackPlugin({
+      template: './public/index.html',
+    }),
+  ],
 };

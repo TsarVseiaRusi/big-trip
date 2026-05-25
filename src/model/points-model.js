@@ -1,62 +1,73 @@
-import Observable from '../framework/observable.js';
+export default class PointsModel {
+  #apiService = null;
+  #points = [];
+  #destinations = [];
+  #offersByType = {};
 
-export default class PointsModel extends Observable {
-  constructor(apiService) {
-    super();
-    this._apiService = apiService;
-    this._points = [];
-    this._isLoading = true;
-    this._error = null;
+  constructor({apiService, points, destinations, offersByType}) {
+    this.#apiService = apiService;
+    this.#points = points;
+    this.#destinations = destinations;
+    this.#offersByType = offersByType;
   }
 
-  async init() {
-    try {
-      this._points = await this._apiService.getPoints();
-      this._error = null;
-    } catch (err) {
-      this._error = err;
-      this._points = [];
-    } finally {
-      this._isLoading = false;
-      this._notify('INIT');
-    }
+  get points() {
+    return this.#points;
+  }
+
+  get destinations() {
+    return this.#destinations;
+  }
+
+  get offersByType() {
+    return this.#offersByType;
   }
 
   getPoints() {
-    return this._points;
+    return this.#points;
   }
 
-  get isLoading() {
-    return this._isLoading;
+  setPoints(points) {
+    this.#points = points;
   }
 
-  get error() {
-    return this._error;
+  setDestinations(destinations) {
+    this.#destinations = destinations;
   }
 
-  async updatePoint(updatedPoint) {
-    const response = await this._apiService.updatePoint(updatedPoint);
-    const index = this._points.findIndex(point => point.id === updatedPoint.id);
-    if (index !== -1) {
-      this._points[index] = response;
-      this._notify('UPDATE', response);
-    }
-    return response;
+  setOffersByType(offersByType) {
+    this.#offersByType = offersByType;
   }
 
   async addPoint(point) {
-    const response = await this._apiService.addPoint(point);
-    this._points.push(response);
-    this._notify('ADD', response);
-    return response;
+    const createdPoint = await this.#apiService.addPoint(point);
+
+    this.#points = [createdPoint, ...this.#points];
+
+    return createdPoint;
+  }
+
+  async updatePoint(point) {
+    const updatedPoint = await this.#apiService.updatePoint(point);
+
+    this.#points = this.#points.map((currentPoint) =>
+      currentPoint.id === updatedPoint.id ? updatedPoint : currentPoint
+    );
+
+    return updatedPoint;
   }
 
   async deletePoint(pointId) {
-    await this._apiService.deletePoint(pointId);
-    const index = this._points.findIndex(point => point.id === pointId);
-    if (index !== -1) {
-      this._points.splice(index, 1);
-      this._notify('DELETE', pointId);
-    }
+    await this.#apiService.deletePoint(pointId);
+
+    this.#points = this.#points.filter((point) => point.id !== pointId);
+  }
+
+  getDestinationById(id) {
+    return this.#destinations.find((destination) => destination.id === id);
+  }
+
+  getOffersByType(type) {
+    return this.#offersByType[type] ?? [];
   }
 }

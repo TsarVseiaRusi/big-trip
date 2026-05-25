@@ -454,8 +454,15 @@ main {
   border-radius: 50%; }
 
 .event__type-btn {
-  padding: 0;
+  width: 42px;
+  height: 42px;
+  padding: 12px;
   border: 1px solid #0d8ae4;
+  border-radius: 50%;
+  background-color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   -webkit-user-select: none;
      -moz-user-select: none;
       -ms-user-select: none;
@@ -480,7 +487,7 @@ main {
           box-shadow: 0 11px 20px rgba(0, 0, 0, 0.219146);
   border-radius: 4px; }
 
-.event__type-toggle:checked + .event__type-list {
+.event__type-toggle:checked ~ .event__type-list {
   display: block; }
 
 .event__type-group {

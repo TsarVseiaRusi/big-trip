@@ -1,4 +1,4 @@
-import AbstractView from '../framework/view/abstract-view.js';
+import AbstractView from './trip-abstract-view.js';
 
 export default class LoadingView extends AbstractView {
   get template() {
